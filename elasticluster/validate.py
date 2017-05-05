@@ -24,7 +24,11 @@ from __future__ import (print_function, division, absolute_import)
 # stdlib imports
 import os
 import string
-from urlparse import urlparse
+
+try:
+    from urlparse import urlparse
+except ImportError:
+    from urllib.parse import urlparse
 
 # 3rd-party modules
 import schema
@@ -104,8 +108,10 @@ def hostname(value):
             " letters, digits or the hyphen character (`-`)"
             .format(value))
 
-_ALLOWED_HOSTNAME_CHARS = set(string.letters + string.digits + '-')
-
+try:
+    _ALLOWED_HOSTNAME_CHARS = set(string.letters + string.digits + '-')
+except:
+    _ALLOWED_HOSTNAME_CHARS = set(string.ascii_letters + string.digits + '-')
 
 @validator
 def nonempty_str(v):
@@ -113,18 +119,6 @@ def nonempty_str(v):
     if not converted:
         raise ValueError("value must be a non-empty string")
     return converted
-
-
-@validator
-def nova_api_version(version):
-    try:
-        from novaclient import client, exceptions
-        client.get_client_class(version)
-        return version
-    except exceptions.UnsupportedVersion as err:
-        raise ValueError(
-            "Unsupported Nova API version: {0}".format(err))
-
 
 @validator
 def url(value):

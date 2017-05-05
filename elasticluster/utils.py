@@ -16,6 +16,7 @@
 #
 # You should have received a copy of the GNU General Public License along
 # with this program; if not,
+import paramiko
 
 __docformat__ = 'reStructuredText'
 __author__ = 'Riccardo Murri <riccardo.murri@gmail.com>'
@@ -28,11 +29,16 @@ import re
 import signal
 import sys
 import time
-import UserDict
+try:
+    from UserDict import DictMixin
+except ImportError:
+    from collections import MutableMapping as DictMixin
 
 # 3rd party imports
 import click
 import netaddr
+
+IPV6_RE = re.compile('\[([a-f:A-F0-9]*[%[0-z]+]?)\](?::(\d+))?')
 
 
 def confirm_or_abort(prompt, exitcode=os.EX_TEMPFAIL, msg=None, **extra_args):
@@ -54,6 +60,24 @@ def confirm_or_abort(prompt, exitcode=os.EX_TEMPFAIL, msg=None, **extra_args):
             sys.stderr.write(msg)
             sys.stderr.write('\n')
         sys.exit(exitcode)
+
+
+def key_warn(old, new):
+    logging.warn('found old key {} in configuration, please replace with new key {} '
+                 '(changing config parameter so we can continue)'.format(old, new), DeprecationWarning)
+
+
+def update_options(renames, options):
+    updated_options = {}
+    for k, v in options.items():
+        original, rename = next(iter([(o, r) for o, r in renames if re.match(o, k)]), (None, None))
+        if original:
+            to_key = re.sub(rename, "", k)
+            key_warn(k, to_key)
+            updated_options[to_key] = v
+        else:
+            updated_options[k] = v
+    return updated_options
 
 
 @contextmanager
@@ -309,7 +333,7 @@ def string_to_boolean(word):
         return False
 
 
-class Struct(object, UserDict.DictMixin):
+class Struct(DictMixin):
     """
     A `dict`-like object, whose keys can be accessed with the usual
     '[...]' lookup syntax, or with the '.' get attribute syntax.
@@ -368,6 +392,15 @@ class Struct(object, UserDict.DictMixin):
 
     def __getitem__(self, name):
         return self.__dict__[name]
+
+    def __delitem__(self, key):
+        del self.__dict__[key]
+
+    def __iter__(self):
+        return iter(self.__dict__)
+
+    def __len__(self):
+        return len(self.__dict__)
 
     def keys(self):
         return self.__dict__.keys()

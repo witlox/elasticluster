@@ -33,7 +33,7 @@ import tempfile
 import unittest
 
 from elasticluster import Cluster
-from elasticluster.cluster import Struct, Node
+from elasticluster.clusterold import Struct, ElasticNode
 from elasticluster.repository import PickleRepository, MemRepository, \
     JsonRepository, YamlRepository, MultiDiskRepository
 
@@ -160,7 +160,7 @@ class JsonRepositoryTests(unittest.TestCase):
         new = self.storage.get(cluster.name)
         assert 'foo' in cluster.nodes
         assert len(cluster.nodes['foo']) > 0
-        assert isinstance(cluster.nodes['foo'][0], Node)
+        assert isinstance(cluster.nodes['foo'][0], ElasticNode)
         assert cluster.nodes['foo'][0].name == 'foo123'
 
 
@@ -227,7 +227,7 @@ class YamlRepositoryTests(unittest.TestCase):
         new = self.storage.get(cluster.name)
         assert 'foo' in cluster.nodes
         assert len(cluster.nodes['foo']) > 0
-        assert isinstance(cluster.nodes['foo'][0], Node)
+        assert isinstance(cluster.nodes['foo'][0], ElasticNode)
         assert cluster.nodes['foo'][0].name == 'foo123'
 
 

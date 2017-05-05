@@ -22,13 +22,12 @@ import logging
 
 log = logging.getLogger("gc3.elasticluster")
 log.DO_NOT_FORK = False
+log.very_verbose = False
 
 # API
-from elasticluster.cluster import Cluster
 from elasticluster.repository import AbstractClusterRepository, MultiDiskRepository
-from elasticluster.providers import AbstractCloudProvider, AbstractSetupProvider
-from elasticluster.providers.ansible_provider import AnsibleSetupProvider
-from elasticluster.providers.ec2_boto import BotoCloudProvider
+from elasticluster.providers.ansible import AnsibleSetupProvider
 from elasticluster.providers.openstack import OpenStackCloudProvider
+from elasticluster.providers.aws import AwsCloudProvider
 from elasticluster.providers.gce import GoogleCloudProvider
-from elasticluster.providers.azure_provider import AzureCloudProvider
+from elasticluster.providers.azure import AzureCloudProvider

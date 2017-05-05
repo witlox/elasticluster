@@ -31,7 +31,7 @@ from elasticluster.exceptions import (
     SubnetError,
     ImageError
 )
-from elasticluster.providers.ec2_boto import BotoCloudProvider
+from elasticluster.providers.aws import BotoCloudProvider
 
 import pytest
 

@@ -14,39 +14,25 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-__author__ = str.join(', ', [
-    'Nicolas Baer <nicolas.baer@uzh.ch>',
-    'Antonio Messina <antonio.s.messina@gmail.com>',
-    'Riccardo Murri <riccardo.murri@gmail.com>',
-])
+from elasticluster.utils import IPV6_RE
 
-# stdlib imports
-from collections import defaultdict
 import logging
 import os
-import re
-import tempfile
 import shlex
 import shutil
+import tempfile
+from collections import defaultdict
 from subprocess import call
-import sys
-import re
 from warnings import warn
 
-
-# 3rd party imports
 from pkg_resources import resource_filename
 
-
-# Elasticluster imports
 import elasticluster
 from elasticluster import log
 from elasticluster.exceptions import ConfigurationError
-from elasticluster.providers import AbstractSetupProvider
 
-IPV6_RE = re.compile('\[([a-f:A-F0-9]*[%[0-z]+]?)\](?::(\d+))?')
 
-class AnsibleSetupProvider(AbstractSetupProvider):
+class AnsibleSetupProvider(object):
     """This implementation uses ansible to configure and manage the cluster
     setup. See https://github.com/ansible/ansible for details.
 
@@ -86,9 +72,7 @@ class AnsibleSetupProvider(AbstractSetupProvider):
     #: file ending of the generated inventory file
     inventory_file_ending = 'ansible-inventory'
 
-    def __init__(self, groups, playbook_path=None, environment_vars=None,
-                 storage_path=None, sudo=True, sudo_user='root',
-                 **extra_conf):
+    def __init__(self, groups, playbook_path=None, environment_vars=None, storage_path=None, sudo=True, sudo_user='root', **extra_conf):
         self.groups = groups
         self._playbook_path = playbook_path
         self.environment = environment_vars or {}
@@ -126,13 +110,9 @@ class AnsibleSetupProvider(AbstractSetupProvider):
             self._playbook_path = os.path.expandvars(self._playbook_path)
         # sanity check
         if not os.path.exists(self._playbook_path):
-            raise ConfigurationError(
-                "playbook `{playbook_path}` could not be found"
-                .format(playbook_path=self._playbook_path))
+            raise ConfigurationError("playbook `{playbook_path}` could not be found".format(playbook_path=self._playbook_path))
         if not os.path.isfile(self._playbook_path):
-            raise ConfigurationError(
-                "playbook `{playbook_path}` is not a file"
-                .format(playbook_path=self._playbook_path))
+            raise ConfigurationError("playbook `{playbook_path}` is not a file".format(playbook_path=self._playbook_path))
 
         if self._storage_path:
             self._storage_path = os.path.expanduser(self._storage_path)
@@ -143,7 +123,6 @@ class AnsibleSetupProvider(AbstractSetupProvider):
         else:
             self._storage_path = tempfile.mkdtemp()
             self._storage_path_tmp = True
-
 
     def setup_cluster(self, cluster, extra_args=tuple()):
         """
@@ -173,9 +152,7 @@ class AnsibleSetupProvider(AbstractSetupProvider):
             # assume it is fine.
             elasticluster.log.info("No setup required for this cluster.")
             return True
-        assert os.path.exists(inventory_path), (
-                "inventory file `{inventory_path}` does not exist"
-                .format(inventory_path=inventory_path))
+        assert os.path.exists(inventory_path), ("inventory file `{inventory_path}` does not exist".format(inventory_path=inventory_path))
 
         # build list of directories to search for roles/include files
         ansible_roles_dirs = [
@@ -195,7 +172,6 @@ class AnsibleSetupProvider(AbstractSetupProvider):
                 if path not in ansible_roles_dirs and os.path.exists(path):
                     ansible_roles_dirs.append(path)
 
-
         # Use env vars to configure Ansible;
         # see all values in https://github.com/ansible/ansible/blob/devel/lib/ansible/constants.py
         #
@@ -212,7 +188,7 @@ class AnsibleSetupProvider(AbstractSetupProvider):
         ansible_env = {
             'ANSIBLE_FORKS':             '10',
             'ANSIBLE_HOST_KEY_CHECKING': 'no',
-            'ANSIBLE_PRIVATE_KEY_FILE':  cluster.user_key_private,
+            'ANSIBLE_PRIVATE_KEY_FILE':  cluster.login.options.get('user_key_private'),
             'ANSIBLE_ROLES_PATH':        ':'.join(reversed(ansible_roles_dirs)),
             'ANSIBLE_SSH_PIPELINING':    'yes',
             'ANSIBLE_TIMEOUT':           '120',
@@ -224,8 +200,7 @@ class AnsibleSetupProvider(AbstractSetupProvider):
         # ...finally allow the environment have the final word
         ansible_env.update(os.environ)
         if __debug__:
-            elasticluster.log.debug(
-                "Calling `ansible-playbook` with the following environment:")
+            elasticluster.log.debug("Calling `ansible-playbook` with the following environment:")
             for var, value in sorted(ansible_env.items()):
                 elasticluster.log.debug("- %s=%r", var, value)
 
@@ -234,8 +209,8 @@ class AnsibleSetupProvider(AbstractSetupProvider):
         # build `ansible-playbook` command-line
         cmd = shlex.split(self.extra_conf.get('ansible_command', 'ansible-playbook'))
         cmd += [
-            os.path.realpath(self._playbook_path),
-            ('--inventory=' + inventory_path),
+            os.path.realpath(self._playbook_path).strip(),
+            ('--inventory=' + inventory_path.strip()),
         ] + list(extra_args)
 
         if self._sudo:
@@ -260,20 +235,17 @@ class AnsibleSetupProvider(AbstractSetupProvider):
             cmd += shlex.split(ansible_extra_args)
 
         cmdline = ' '.join(cmd)
-        elasticluster.log.debug("Running Ansible command `%s` ...", cmdline)
+        elasticluster.log.debug("Running Ansible command `%s`", cmdline)
 
         rc = call(cmd, env=ansible_env, bufsize=1, close_fds=True)
         if rc == 0:
             elasticluster.log.info("Cluster correctly configured.")
             return True
         else:
-            elasticluster.log.error(
-                "Command `%s` failed with exit code %d.", cmdline, rc)
-            elasticluster.log.error(
-                "Check the output lines above for additional information on this error.")
-            elasticluster.log.error(
-                "The cluster has likely *not* been configured correctly."
-                " You may need to re-run `elasticluster setup` or fix the playbooks.")
+            elasticluster.log.error("Command `%s` failed with exit code %d.", cmdline, rc)
+            elasticluster.log.error("Check the output lines above for additional information on this error.")
+            elasticluster.log.error("The cluster has likely *not* been configured correctly.")
+            elasticluster.log.error("You may need to re-run `elasticluster setup` or fix the playbooks.")
             return False
 
     def _build_inventory(self, cluster):
@@ -284,30 +256,23 @@ class AnsibleSetupProvider(AbstractSetupProvider):
         :type cluster: :py:class:`elasticluster.cluster.Cluster`
         """
         inventory_data = defaultdict(list)
-        for node in cluster.get_all_nodes():
-            if node.kind not in self.groups:
-                # FIXME: should this raise a `ConfigurationError` instead?
-                warn("Node kind `{0}` not defined in cluster!".format(node.kind))
-                continue
-            extra_vars = ['ansible_user=%s' % node.image_user]
-            # check for nonstandard port, either IPv4 or IPv6
-            if node.preferred_ip and ':' in node.preferred_ip:
-                match = IPV6_RE.match(node.preferred_ip)
-                if match:
-                    host_port = match.groups()[1]
-                else:
-                    _, _, host_port = node.preferred_ip.partition(':')
-                if host_port:
-                    extra_vars.append('ansible_port=%s' % host_port)
 
-            if node.kind in self.environment:
-                extra_vars.extend('%s=%s' % (k, v) for k, v in
-                                  self.environment[node.kind].items())
-            for group in self.groups[node.kind]:
-                connection_ip = node.preferred_ip
-                if connection_ip:
-                    inventory_data[group].append(
-                        (node.name, connection_ip, str.join(' ', extra_vars)))
+        for node_type, _, nodes in cluster.node_types():
+            log.debug('configuring nodes: %s', ', '.join([n.name for n in nodes]))
+            for node in nodes:
+                extra_vars = ['ansible_user=%s' % cluster.login.options.get('image_user')]
+                # check for nonstandard port, either IPv4 or IPv6
+                ip, port = cluster.node_ssh_address_and_port(node.name)
+                if not ip:
+                    log.error('could not determine valid ip for %s', node.name)
+                    continue
+                extra_vars.append('ansible_port=%s' % port)
+                if node_type in self.environment:
+                    extra_vars.extend('{}={}'.format(k, v) for k, v in self.environment[node_type].items())
+                for roles in [r for g, r in self.groups.items() if g == node_type]:
+                    for role in roles:
+                        log.debug('adding role %s to node %s', role, node.name)
+                        inventory_data[role].append((node.name, ip, ' '.join(extra_vars)))
 
         if not inventory_data:
             elasticluster.log.info("No inventory file was created.")
@@ -318,11 +283,9 @@ class AnsibleSetupProvider(AbstractSetupProvider):
         if self._storage_path_tmp:
             if not self._storage_path:
                 self._storage_path = tempfile.mkdtemp()
-            elasticluster.log.warning(
-                "Writing inventory file to tmp dir `%s`", self._storage_path)
+            elasticluster.log.warning("Writing inventory file to tmp dir `%s`", self._storage_path)
 
-        inventory_path = os.path.join(
-            self._storage_path, (cluster.name + '.inventory'))
+        inventory_path = os.path.join(self._storage_path, (cluster.name + '.inventory'))
         log.debug("Writing Ansible inventory to file `%s` ...", inventory_path)
         with open(inventory_path, 'w+') as inventory_file:
             for section, hosts in inventory_data.items():
@@ -330,20 +293,18 @@ class AnsibleSetupProvider(AbstractSetupProvider):
                 # iterable" if a section is empty, so ensure we have something
                 # to write in there
                 if hosts:
-                    inventory_file.write("\n[" + section + "]\n")
+                    inventory_file.write(str("\n[" + section + "]\n"))
                     for host in hosts:
                         # don't want port, makes it look like ipv6
                         if ':' in host[1]:
-                            match = IPV6_RE.match(node.preferred_ip)
+                            match = IPV6_RE.match(host[1])
                             if match:
                                 host = (host[0], match.groups()[0], host[2])
                             else:
-                                host = (host[0], host[1].partition(':')[0],
-                                        host[2])
-                        hostline = "%s ansible_host=%s %s\n" % host
-                        inventory_file.write(hostline)
+                                host = (host[0], host[1].partition(':')[0], host[2])
+                        host_line = "{} ansible_host={} {}\n".format(host[0], host[1], host[2])
+                        inventory_file.write(str(host_line))
         return inventory_path
-
 
     def cleanup(self, cluster):
         """Deletes the inventory file used last recently used.
@@ -352,8 +313,7 @@ class AnsibleSetupProvider(AbstractSetupProvider):
         :type cluster: :py:class:`elasticluster.cluster.Cluster`
         """
         if self._storage_path and os.path.exists(self._storage_path):
-            fname = '%s.%s' % (AnsibleSetupProvider.inventory_file_ending,
-                               cluster.name)
+            fname = '{}.{}'.format(AnsibleSetupProvider.inventory_file_ending, cluster.name)
             inventory_path = os.path.join(self._storage_path, fname)
 
             if os.path.exists(inventory_path):
@@ -363,9 +323,7 @@ class AnsibleSetupProvider(AbstractSetupProvider):
                         if len(os.listdir(self._storage_path)) == 0:
                             shutil.rmtree(self._storage_path)
                 except OSError as ex:
-                    log.warning(
-                        "AnsibileProvider: Ignoring error while deleting "
-                        "inventory file %s: %s", inventory_path, ex)
+                    log.warning("AnsibileProvider: Ignoring error while deleting inventory file %s: %s", inventory_path, ex)
 
     def __setstate__(self, state):
         self.__dict__ = state

@@ -28,7 +28,7 @@ import sys
 
 from elasticluster.subcommands import AbstractCommand
 
-from elasticluster import repository, cluster
+from elasticluster import repository, clusterold
 
 # commit 73979e27b3cd8e62d2f023d915ffd162d36bb301
 # Author: Antonio Messina <antonio.s.messina@gmail.com>
@@ -83,7 +83,7 @@ def patch_cluster():
     """
     Patch Cluster class to allow Pickle to load old clusters
     """    
-    cluster.Cluster.__setstate__ = __setstate_upgrade__
+    clusterold.Cluster.__setstate__ = __setstate_upgrade__
     
 
 class MigrationCommand(AbstractCommand):

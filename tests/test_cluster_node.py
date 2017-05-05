@@ -31,7 +31,7 @@ import pytest
 from pytest import raises
 
 # ElastiCluster imports
-from elasticluster.cluster import Cluster, Node
+from elasticluster.clusterold import Cluster, ElasticNode
 from elasticluster.exceptions import ClusterError
 from elasticluster.repository import PickleRepository
 from elasticluster.utils import Struct
@@ -49,7 +49,7 @@ __author__ = (', '.join([
 @pytest.fixture
 def node():
     with NamedTemporaryFile() as tmp:
-        node = Node(  # pylint: disable=redefined-outer-name
+        node = ElasticNode(  # pylint: disable=redefined-outer-name
             name='test',
             cluster_name='cluster',
             kind='frontend',

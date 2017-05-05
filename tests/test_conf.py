@@ -19,16 +19,14 @@
 from __future__ import (absolute_import, division, print_function)
 
 import collections
-from copy import copy, deepcopy
 import os
+from copy import copy, deepcopy
 from os.path import join
 
-# 3rd-party imports
-from mock import patch
 import pytest
-from pytest import raises
+from _helpers.config import make_config_snippet
+from mock import patch
 
-#rom elasticluster.conf import ConfigReader, ConfigValidator, Creator
 from elasticluster.conf import (
     load_config_files,
     make_creator,
@@ -38,12 +36,6 @@ from elasticluster.conf import (
     _dereference_config_tree,
     _build_node_section,
 )
-from elasticluster.cluster import Node
-from elasticluster.exceptions import ClusterNotFound
-from elasticluster.providers.ansible_provider import AnsibleSetupProvider
-from elasticluster.providers.ec2_boto import BotoCloudProvider
-
-from _helpers.config import make_config_snippet
 
 
 CONFIG_TXT = ('''
@@ -647,7 +639,7 @@ compute_groups = slurm_worker
         )
     creator = make_creator(config_path)
     setup = creator.create_setup_provider('example_openstack')
-    from elasticluster.providers.ansible_provider import AnsibleSetupProvider
+    from elasticluster.providers.ansible import AnsibleSetupProvider
     assert isinstance(setup, AnsibleSetupProvider)
 
 

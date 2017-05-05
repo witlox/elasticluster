@@ -20,6 +20,7 @@
 # 59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
 
 import sys
+import pip
 
 # fix Python issue 15881 (on Python <2.7.5)
 try:
@@ -28,13 +29,19 @@ except ImportError:
     pass
 
 
-# Ensure we use a recent enough version of setuptools: CentOS7 still ships with
-# 0.9.8! Although at the moment ElastiCluster does not make use of any advanced
-# feature from `setuptools`, some dependent package requires >=17.1 (at the
-# time of this writing) and this version number is likely to increase with time
-# -- so just pick a "known good one".
-from ez_setup import use_setuptools
-use_setuptools(version='21.0.0')
+# requirements for latest versions of setuptools
+def pip_upgrade(package):
+    pip.main(['install', '--upgrade', package])
+
+
+def pip_install(package):
+    pip.main(['install', package])
+
+pip_upgrade('pip')
+pip_install('six')
+pip_install('packaging')
+pip_install('appdirs')
+pip_install('tox')
 
 
 ## auxiliary functions
@@ -53,6 +60,7 @@ def read_whole_file(path):
 # on how to run tox when python setup.py test is run
 #
 from setuptools.command.test import test as TestCommand
+
 
 class Tox(TestCommand):
     def finalize_options(self):
@@ -82,37 +90,16 @@ class Tox(TestCommand):
 python_version = sys.version_info[:2]
 if python_version == (2, 6):
     version_dependent_requires = [
-        # Alternate dependencies for Python 2.6:
-        # - PyCLI requires argparse,
-        'argparse',
-        # - OpenStack's "keystoneclient" requires `importlib`
-        'importlib',
-        # - support for Python 2.6 was removed from `novaclient` in commit
-        #   81f8fa655ccecd409fe6dcda0d3763592c053e57 which is contained in
-        #   releases 3.0.0 and above; however, we also need to pin down
-        #   the version of `oslo.config` and all the dependencies thereof,
-        #   otherwise `pip` will happily download the latest and
-        #   incompatible version,since `python-novaclient` specifies only
-        #   the *minimal* version of dependencies it is compatible with...
-        'stevedore<1.10.0',
-        'debtcollector<1.0.0',
-        'keystoneauth<2.0.0',
-        # yes, there"s `keystoneauth` and `keystoneauth1` !!
-        'keystoneauth1<2.0.0',
-        'oslo.config<3.0.0',
-        'oslo.i18n<3.1.0',
-        'oslo.serialization<2.1.0',
-        'oslo.utils<3.1.0',
-        'python-keystoneclient<2.0.0',
-        'python-novaclient<3.0.0',
+        'configparser',
     ]
 elif python_version == (2, 7):
     version_dependent_requires = [
-        'python-novaclient',
+        'configparser',
     ]
 else:
-    raise RuntimeError("ElastiCluster requires Python 2.6 or 2.7")
-
+    version_dependent_requires = [
+        'urllib3',
+    ]
 
 ## real setup description begins here
 #
@@ -156,28 +143,15 @@ setup(
         ]
     },
     install_requires=([
-        'PyCLI',
-        'ansible>=2.2.1',  ## see: https://www.computest.nl/advisories/CT-2017-0109_Ansible.txt
-        'click>=4.0',  ## click.prompt() added in 4.0
-        'coloredlogs',
-        'netaddr',
-        'paramiko',
-        'schema',
-        # EC2 clouds
-        'boto',
-        # GCE cloud
-        'google-api-python-client',
-        'google-compute-engine',
-        'python-gflags',
-        'simplejson>=2.5.0', # needed by `uritemplate` but somehow not picked up
-        'pytz',   ## required by `positional` but somehow not picked up
-        'httplib2>=0.9.1',  ## required by `oauth2client` but somehow not picked up
-        # Azure cloud
-        'azure',
-        # OpenStack clouds
-        'netifaces',
-        #'python-novaclient' ## this needs special treatment depending on Python version, see below
-    ] + version_dependent_requires),
+                          'PyYAML',
+                          'ansible>=2.2.1',  ## see: https://www.computest.nl/advisories/CT-2017-0109_Ansible.txt
+                          'click>=4.0',  ## click.prompt() added in 4.0
+                          'coloredlogs',
+                          'netaddr',
+                          'paramiko',
+                          'schema',
+                          'apache-libcloud==1.5.0',
+                      ] + version_dependent_requires),
     tests_require=['tox', 'mock', 'pytest>=2.10'],  # read right-to-left
     cmdclass={'test': Tox},
 )

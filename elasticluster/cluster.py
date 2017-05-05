@@ -120,7 +120,7 @@ class Cluster(object):
                 data = pickle.loads(sf)
         self.template = data.get('template')
         self.name = data.get('name')
-        if data.get('options'):
+        if not self.options:
             self.options = data.get('options')
         self.nodes = []
         for node in data.get('nodes'):
@@ -214,20 +214,28 @@ class Cluster(object):
             log.info('adding node %s to cluster %s', node_config['node_name'], self.name)
             self.nodes.append(provider.start_instance(**node_config))
             if wait:
-                with timeout(self.startup_timeout, raise_timeout_error):
-                    node_up = False
-                    while not node_up:
-                        self.__update_node_states()
-                        node = next(iter([n for n in self.nodes if n.name == node_config['node_name']]), None)
-                        if not node:
-                            log.error('something went wrong while trying to start %s!', node_config['node_name'])
-                            raise NodeNotFound
-                        else:
-                            log.debug('%s status: %s', node.name, node.state)
-                            if node.state != NodeState.RUNNING:
-                                time.sleep(self.polling_interval)
+                try:
+                    with timeout(self.startup_timeout, raise_timeout_error):
+                        node_up = False
+                        while not node_up:
+                            self.__update_node_states()
+                            node = next(iter([n for n in self.nodes if n.name == node_config['node_name']]), None)
+                            if not node:
+                                log.error('something went wrong while trying to start %s!', node_config['node_name'])
+                                raise NodeNotFound
                             else:
-                                node_up = True
+                                log.debug('%s status: %s', node.name, node.state)
+                                if node.state != NodeState.RUNNING:
+                                    time.sleep(self.polling_interval)
+                                else:
+                                    node_up = True
+                except TimeoutError:
+                    node = next(iter([n for n in self.nodes if n.name == node_config['node_name']]), None)
+                    if node:
+                        log.error('could not initialize node %s, terminating it', node.name)
+                        node.destroy()
+                    else:
+                        raise NodeNotFound('could not find the node we tried to start, check the console')
         self.__dump()
 
     def remove(self, node_type, count=1):

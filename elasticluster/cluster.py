@@ -314,49 +314,52 @@ class Cluster(object):
         ssh_port = self.ssh_port
         if self.options.get('ssh_port'):
             ssh_port = self.options.get('ssh_port')
-
         ssh = paramiko.SSHClient()
-        ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-        if key_file:
-            key_file_path = os.path.expandvars(os.path.expanduser(key_file))
-            if os.path.exists(key_file_path):
-                ssh.load_host_keys(key_file_path)
+        try:
+            ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+            if key_file:
+                key_file_path = os.path.expandvars(os.path.expanduser(key_file))
+                if os.path.exists(key_file_path):
+                    ssh.load_host_keys(key_file_path)
 
-        for ip in node.private_ips + node.public_ips:
-            log.debug('trying to connect on %s:%s', ip, self.ssh_port)
-            try:
-                private_key_file = os.path.expandvars(os.path.expanduser(self.login.options.get('user_key_private')))
-                with timeout(self.startup_timeout, raise_timeout_error):
-                    host_started = False
-                    while not host_started:
-                        try:
-                            ssh.connect(ip,
-                                        username=self.login.options.get('image_user'),
-                                        password=self.login.options.get('image_user_password'),
-                                        key_filename=private_key_file,
-                                        allow_agent=True,
-                                        look_for_keys=True,
-                                        timeout=5,
-                                        port=ssh_port)
+            private_key_file = os.path.expandvars(os.path.expanduser(self.login.options.get('user_key_private')))
+            for ip in node.private_ips + node.public_ips:
+                log.debug('trying to connect on %s:%s', ip, self.ssh_port)
+                try:
+                    with timeout(self.startup_timeout, raise_timeout_error):
+                        host_started = False
+                        while not host_started:
                             try:
-                                if not os.path.exists(self.known_host_file):
-                                    open(self.known_host_file, 'a').close()
-                                keys = paramiko.hostkeys.HostKeys(self.known_host_file)
-                                for host, key in ssh.get_host_keys().items():
-                                    for t, d in key.items():
-                                        keys.add(host, t, d)
-                                keys.save(self.known_host_file)
-                            except IOError:
-                                log.warning("Ignoring error saving known_hosts file: %s", self.known_host_file)
-                            host_started = True
-                        except socket.error as ex:
-                            log.debug("Host %s (%s) not reachable, retrying. (%s)", self.name, ip, ex)
-                            time.sleep(self.polling_interval)
-                return ip, ssh_port
-            except paramiko.BadHostKeyException:
-                log.error("Invalid host key: host %s (%s); check keyfile: %s", self.name, ip, key_file)
-            except paramiko.SSHException as ex:
-                log.debug("Ignoring error %s while connecting to %s", str(ex), ip)
+                                ssh.connect(ip,
+                                            username=self.login.options.get('image_user'),
+                                            password=self.login.options.get('image_user_password'),
+                                            key_filename=private_key_file,
+                                            allow_agent=True,
+                                            look_for_keys=True,
+                                            timeout=5,
+                                            port=ssh_port)
+                                try:
+                                    if not os.path.exists(self.known_host_file):
+                                        open(self.known_host_file, 'a').close()
+                                    keys = paramiko.hostkeys.HostKeys(self.known_host_file)
+                                    for host, key in ssh.get_host_keys().items():
+                                        for t, d in key.items():
+                                            keys.add(host, t, d)
+                                    keys.save(self.known_host_file)
+                                except IOError:
+                                    log.warning("Ignoring error saving known_hosts file: %s", self.known_host_file)
+                                host_started = True
+                            except socket.error as ex:
+                                log.debug("Host %s (%s) not reachable, retrying. (%s)", self.name, ip, ex)
+                                time.sleep(self.polling_interval)
+                    return ip, ssh_port
+                except paramiko.SSHException as ex:
+                    log.debug("Ignoring error %s while connecting to %s", str(ex), ip)
+                except paramiko.BadHostKeyException:
+                    log.error("Invalid host key: host %s (%s); check keyfile: %s", self.name, ip, key_file)
+        finally:
+            if ssh:
+                ssh.close()
         return None, None
 
     def __str__(self):

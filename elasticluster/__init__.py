@@ -25,7 +25,6 @@ log.DO_NOT_FORK = False
 log.very_verbose = False
 
 # API
-from elasticluster.repository import AbstractClusterRepository, MultiDiskRepository
 from elasticluster.providers.ansible import AnsibleSetupProvider
 from elasticluster.providers.openstack import OpenStackCloudProvider
 from elasticluster.providers.aws import AwsCloudProvider

@@ -51,7 +51,7 @@
 - name: add default user with password
   user:
     name: "{{ rstudio_default_user }}"
-    password: "{{ rstudio_default_pass | password_hash('sha512') }}"
+    password: "{{ rstudio_default_pass }}"
     comment: "R Studio web user"
 
 

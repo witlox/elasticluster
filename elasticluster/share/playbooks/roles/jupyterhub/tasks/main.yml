@@ -114,7 +114,7 @@
 - name: add default user with password
   user:
     name: "{{ jupyter_hub_default_user }}"
-    password: "{{ jupyter_hub_default_pass | password_hash('sha512') }}"
+    password: "{{ jupyter_hub_default_pass }}"
     comment: "Jupyter Hub user"
 
 

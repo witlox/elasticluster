@@ -5,4 +5,4 @@ rstudio_server_www_port: 80
 rstudio_server_www_address: 0.0.0.0
 
 rstudio_default_user: rstudio
-rstudio_default_pass: uzh-r
+rstudio_default_pass: $1$uzh$8uxtJOL1wpmdDQHV.E/rN/

@@ -15,13 +15,12 @@
 # You should have received a copy of the GNU General Public License
 # along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #
-import time
 import json
 import os
 import sys
-import re
 
 from elasticluster.configuration import Configuration
+from elasticluster.validate import hostname
 
 __author__ = ', '.join([
     'Nicolas Baer <nicolas.baer@uzh.ch>',
@@ -109,6 +108,18 @@ class Start(AbstractCommand):
         """
         Starts a new cluster.
         """
+        try:
+            if self.params.cluster_name:
+                hostname(self.params.cluster_name)
+            else:
+                hostname(self.params.cluster)
+        except ValueError as e:
+            if self.params.cluster_name:
+                log.error('incorrect hostname given as cluster name: %s', e)
+            else:
+                log.error('cannot use template name as cluster name, it contains invalid chars: %s', e)
+            sys.exit(1)
+
         log.info('trying to start cluster %s (%s)', self.params.cluster_name, self.params.cluster)
         configuration = Configuration(self.params.config, self.params.storage)
         cluster = next(configuration.get_cluster(self.params.cluster, self.params.cluster_name), None)

@@ -208,9 +208,9 @@ class Cluster(object):
         for x in range(node_index + 1, node_index + count + 1):
             node_config = dict(self.options, **self.login.options)
             if self.template == self.name:
-                node_config['node_name'] = '{}-{}{:03}'.format(self.name, node_type, x)
+                node_config['node_name'] = '{}-{}{:03}'.format(self.template, node_type, x)
             else:
-                node_config['node_name'] = '{}-{}-{}{:03}'.format(self.template, self.name, node_type, x)
+                node_config['node_name'] = '{}-{}{:03}'.format(self.name, node_type, x)
             log.info('adding node %s to cluster %s', node_config['node_name'], self.name)
             self.nodes.append(provider.start_instance(**node_config))
             if wait:
@@ -242,9 +242,9 @@ class Cluster(object):
         node_index = self.__last_allocated_node_index(node_type)
         for x in range(node_index, node_index - count, -1):
             if self.template == self.name:
-                self.remove_by_name('{}-{}{:03}'.format(self.name, node_type, x))
+                self.remove_by_name('{}-{}{:03}'.format(self.template, node_type, x))
             else:
-                self.remove_by_name('{}-{}-{}{:03}'.format(self.template, self.name, node_type, x))
+                self.remove_by_name('{}-{}{:03}'.format(self.name, node_type, x))
 
     def remove_by_name(self, name):
         self.__update_node_states()

@@ -109,6 +109,7 @@ class Start(AbstractCommand):
         """
         Starts a new cluster.
         """
+        log.info('trying to start cluster %s (%s)', self.params.cluster_name, self.params.cluster)
         configuration = Configuration(self.params.config, self.params.storage)
         cluster = next(configuration.get_cluster(self.params.cluster, self.params.cluster_name), None)
 
@@ -163,6 +164,7 @@ class Stop(AbstractCommand):
         """
         Stops the cluster if it's running.
         """
+        log.info('trying to stop cluster %s', self.params.cluster)
         cluster = Configuration.find(self.params.config, self.params.cluster, self.params.storage)
         if not cluster:
             log.error("Cannot stop cluster `%s`, no active configuration found", self.params.cluster)
@@ -218,6 +220,7 @@ class ResizeCluster(AbstractCommand):
             raise ConfigurationError("Invalid syntax for argument: %s" % ex)
 
     def execute(self):
+        log.info('trying to resize cluster %s', self.params.cluster)
         cluster = Configuration.find(self.params.config, self.params.cluster, self.params.storage)
         if not cluster:
             log.error("Cannot resize cluster `%s`, no active configuration found", self.params.cluster)
@@ -257,6 +260,7 @@ class RemoveNode(AbstractCommand):
                                                                               "prompt.")
 
     def execute(self):
+        log.info('trying to remove node %s from cluster %s', self.params.node, self.params.cluster)
         cluster = Configuration.find(self.params.config, self.params.cluster, self.params.storage)
         if not cluster:
             log.error("Cannot remove node from cluster `%s`, no active configuration found", self.params.cluster)
@@ -389,6 +393,7 @@ class SetupCluster(AbstractCommand):
                                                                   "setup provider command-line invocation."))
 
     def execute(self):
+        log.info('trying to setup cluster %s', self.params.cluster)
         cluster = Configuration.find(self.params.config, self.params.cluster, self.params.storage)
         if not cluster:
             log.error("Cannot setup cluster `%s`, no active configuration found", self.params.cluster)

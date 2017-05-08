@@ -315,6 +315,7 @@ class Cluster(object):
         ssh_port = self.ssh_port
         if self.options.get('ssh_port'):
             ssh_port = self.options.get('ssh_port')
+
         with paramiko.SSHClient() as ssh:
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             if key_file:
@@ -348,6 +349,7 @@ class Cluster(object):
                                     keys.save(self.known_host_file)
                                 except IOError:
                                     log.warning("Ignoring error saving known_hosts file: %s", self.known_host_file)
+                                ssh.close()
                                 host_started = True
                             except socket.error as ex:
                                 log.debug("Host %s (%s) not reachable, retrying. (%s)", self.name, ip, ex)

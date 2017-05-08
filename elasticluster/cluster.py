@@ -315,8 +315,7 @@ class Cluster(object):
         ssh_port = self.ssh_port
         if self.options.get('ssh_port'):
             ssh_port = self.options.get('ssh_port')
-        ssh = paramiko.SSHClient()
-        try:
+        with paramiko.SSHClient() as ssh:
             ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
             if key_file:
                 key_file_path = os.path.expandvars(os.path.expanduser(key_file))
@@ -356,9 +355,6 @@ class Cluster(object):
                         return ip, ssh_port
                 except paramiko.SSHException as ex:
                     log.debug("Ignoring error %s while connecting to %s", str(ex), ip)
-        finally:
-            if ssh:
-                ssh.close()
         return None, None
 
     def __str__(self):

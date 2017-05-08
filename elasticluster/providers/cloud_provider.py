@@ -118,7 +118,11 @@ class CloudProvider(object):
         return next(iter([i for i in self.driver.list_images() if i.id == image_id]), None)
 
     def list_key_pairs(self):
-        for kp in self.driver.list_keypairs():
+        try:
+            key_pairs = self.driver.list_keypairs()
+        except AttributeError:
+            key_pairs = self.driver.ex_list_keypairs()
+        for kp in key_pairs:
             yield kp.name
 
     def import_key_from_file(self, name, public_key):

@@ -59,19 +59,15 @@ class GoogleCloudProvider(CloudProvider):
         pass
 
     def start_instance(self, boot_disk_size=10, tags=None, scheduling=None, **config):
-        super(GoogleCloudProvider, self).start_instance(**config)
+        running_config = super(GoogleCloudProvider, self).start_instance(**config)
         service_accounts = []
         if config.get('email'):
             for email in config.get('email').split(','):
                 service_accounts.append({'email': email.strip(), 'scopes': GCE_DEFAULT_SCOPES})
-        node = self.start_node({'name': config.get('node_name'),
-                                'image': config.get('image'),
-                                'size': config.get('flavor'),
-                                'location': config.get('zone'),
-                                'external_ip': config.get('external_ip'),
-                                'ex_network': config.get('networks'),
-                                'ex_tags': config.get('tags'),
-                                'ex_boot_disk': config.get('boot_disk'),
-                                'ex_disk_type': config.get('disk_type'),
-                                'ex_service_accounts': service_accounts})
-        return node
+        running_config['location'] = config.get('zone')
+        running_config['ex_tags'] = config.get('tags')
+        running_config['external_ip'] = config.get('external_ip')
+        running_config['ex_boot_disk'] = config.get('boot_disk')
+        running_config['ex_disk_type'] = config.get('disk_type')
+        running_config['ex_service_accounts'] = service_accounts
+        return self.start_node(running_config)

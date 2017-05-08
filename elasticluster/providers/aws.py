@@ -57,15 +57,10 @@ class AwsCloudProvider(CloudProvider):
         self.driver.ex_associate_address_with_node(node, elastic_ip)
 
     def start_instance(self, **config):
-        super(AwsCloudProvider, self).start_instance(**config)
-        node = self.start_node({'name': config.get('node_name'),
-                                'image': config.get('image'),
-                                'size': config.get('flavor'),
-                                'ex_userdata': config.get('image_userdata'),
-                                'ex_security_groups': config.get('security_groups'),
-                                'ex_iamprofile': config.get('iam_profile'),
-                                'ex_assign_public_ip': config.get('public_ip')})
-
+        running_config = super(AwsCloudProvider, self).start_instance(**config)
+        running_config['ex_iamprofile'] = config.get('iam_profile')
+        running_config['ex_assign_public_ip'] = config.get('public_ip')
+        node = self.start_node(running_config)
         if self.floating_ip:
             self.allocate_floating_ip(node)
         return node.id

@@ -71,9 +71,9 @@ class OpenStackCloudProvider(CloudProvider):
             log.warn('could not locate default ip pool, assignment of floating IP failed')
 
     def start_instance(self, **config):
-        config = super(OpenStackCloudProvider, self).start_instance(**config)
-        config['ex_keyname'] = self.key_name
-        node = self.start_node(config)
+        running_config = super(OpenStackCloudProvider, self).start_instance(**config)
+        running_config['ex_keyname'] = self.key_name
+        node = self.start_node(running_config )
         if node:
             if config.get('request_floating_ip'):
                 self.allocate_floating_ip(node)

@@ -28,7 +28,8 @@ KEY_RENAMES = [(r'([0-9a-z_-]+)_min_nodes', r'\1_nodes_min'),
                ('flavor', 'size'),
                ('image_id', 'image'),
                ('network_ids', 'networks'),
-               ('security_group', 'security_groups')]
+               ('security_group', 'security_groups'),
+               ('image_userdata', 'ex_userdata')]
 
 
 class Cluster(object):

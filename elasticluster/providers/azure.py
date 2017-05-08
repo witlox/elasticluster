@@ -47,9 +47,6 @@ class AzureCloudProvider(CloudProvider):
         pass
 
     def start_instance(self, boot_disk_size=10, tags=None, scheduling=None, **config):
-        super(AzureCloudProvider, self).start_instance(**config)
-        node = self.start_node({'name': config.get('node_name'),
-                                'image': config.get('image'),
-                                'size': config.get('flavor'),
-                                'ex_cloud_service_name': AZURE_CLOUD_SERVICE_NAME})
-        return node
+        running_config = super(AzureCloudProvider, self).start_instance(**config)
+        running_config['ex_cloud_service_name'] = AZURE_CLOUD_SERVICE_NAME
+        return self.start_node(running_config)

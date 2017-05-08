@@ -21,7 +21,7 @@ from tempfile import NamedTemporaryFile
 
 import paramiko
 
-from libcloud.compute.base import NodeAuthSSHKey
+from libcloud.compute.base import NodeAuthSSHKey, NodeAuthPassword
 from libcloud.compute.types import NodeState
 from paramiko import SSHException
 
@@ -38,13 +38,17 @@ class CloudProvider(object):
     project_name = None
     floating_ip = False
     rules = None
-    private_key = None
+    auth = None
 
     @abc.abstractmethod
     def __init__(self, storage_path=None, **config):
         self.storage_path = storage_path
         self.project_name = config.get('project_name')
         self.key_name = config.get('user_key_name')
+
+    @abc.abstractmethod
+    def resolve_network(self, network_id):
+        pass
 
     @abc.abstractmethod
     def allocate_floating_ip(self, node):
@@ -55,26 +59,11 @@ class CloudProvider(object):
         pass
 
     @abc.abstractmethod
-    def list_key_pairs(self):
+    def resolve_security_group(self, security_group_name):
         pass
-
-    @abc.abstractmethod
-    def import_key_from_file(self, name, public_key):
-        pass
-
-    def get_auth(self):
-        return NodeAuthSSHKey(str(self.private_key))
 
     @abc.abstractmethod
     def list_security_groups(self):
-        pass
-
-    @abc.abstractmethod
-    def resolve_network(self, network_id):
-        pass
-
-    @abc.abstractmethod
-    def resolve_security_group(self, security_group_name):
         pass
 
     @abc.abstractmethod
@@ -83,6 +72,10 @@ class CloudProvider(object):
                               config.get('user_key_private'),
                               config.get('user_key_public'),
                               config.get('image_user_password'))
+        if self.driver.get_key_pair(config.get('user_key_name')):
+            self.auth = NodeAuthSSHKey(self.driver.get_key_pair(config.get('user_key_name')).public_key)
+        else:
+            self.auth = NodeAuthPassword(config.get('image_user_password'))
 
     def list_nodes(self):
         return self.driver.list_nodes()
@@ -94,6 +87,7 @@ class CloudProvider(object):
             node.destroy()
 
     def start_node(self, config):
+        config['auth'] = self.auth
         node = self.driver.create_node(**config)
         if self.floating_ip:
             self.allocate_floating_ip(node)
@@ -123,6 +117,16 @@ class CloudProvider(object):
     def check_image(self, image_id):
         return next(iter([i for i in self.driver.list_images() if i.id == image_id]), None)
 
+    def list_key_pairs(self):
+        for kp in self.driver.list_keypairs():
+            yield kp.name
+
+    def import_key_from_file(self, name, public_key):
+        try:
+            self.driver.import_key_pair_from_file(name, public_key)
+        except AttributeError:
+            self.driver.ex_import_key_pair_from_file(name, public_key)
+
     def __import_pem(self, key_name, pem_file_path, password):
         try:
             pem = paramiko.RSAKey.from_private_key_file(os.path.expandvars(os.path.expanduser(pem_file_path)), password)
@@ -141,8 +145,8 @@ class CloudProvider(object):
 
     def prepare_key_pair(self, key_name, private_key_path, public_key_path, password):
         if not key_name:
-            raise KeypairError('user_key_name needs to be defined for cluster')
-
+            log.warn('user_key_name has not been defined, assuming password based authentication')
+            return
         log.debug("Checking key pair `%s` ...", key_name)
         if key_name in self.list_key_pairs():
             log.debug('Key pair is already installed.')
@@ -153,7 +157,8 @@ class CloudProvider(object):
             self.import_key_from_file(key_name, os.path.expandvars(os.path.expanduser(public_key_path)))
         elif private_key_path:
             if not private_key_path.endswith('.pem'):
-                raise ConfigurationError('can only work with .pem private keys, derive public key and set user_key_public')
+                raise ConfigurationError('can only work with .pem private keys, '
+                                         'derive public key and set user_key_public')
             log.debug("deriving and importing public key from private key")
             self.__import_pem(key_name, private_key_path, password)
         elif os.path.exists(os.path.join(self.storage_path, '{}.pem'.format(key_name))):
@@ -163,12 +168,6 @@ class CloudProvider(object):
             with open(os.path.join(self.storage_path, '{}.pem'.format(key_name)), 'w') as new_key_file:
                 new_key_file.write(key_pair)
             self.__import_pem(key_name, os.path.join(self.storage_path, '{}.pem'.format(key_name)), password)
-
-    def _get_ip_pool(self):
-        return next(self.driver.ex_list_floating_ip_pools(), None)
-
-    def _attached_floating_ips(self, node):
-        return list(set(self.driver.ex_list_floating_ips()) & set(node.public_ips + node.private_ips))
 
     def _get_node(self, node):
         return next([n for n in self.driver.list_nodes() if n.id == node.id], None)

@@ -6,16 +6,16 @@ import socket
 import time
 from collections import defaultdict
 
-import logging
 import paramiko
 import yaml
+
 from libcloud.compute.base import Node
 from libcloud.compute.types import NodeState
 from schema import Schema, Optional
 
 from elasticluster import log
 from elasticluster.exceptions import TimeoutError, NodeNotFound
-from elasticluster.utils import timeout, IPV6_RE, update_options
+from elasticluster.utils import timeout, update_options
 from elasticluster.validate import nonempty_str, boolean
 
 
@@ -183,7 +183,7 @@ class Cluster(object):
             log.error('could not initialize all nodes, destroying cluster %s', self.name)
             for node in self.nodes:
                 log.debug('terminating %s', node.name)
-                node.destroy()
+                self.remove_by_name(node.name)
         self.__dump()
 
     def stop(self):
@@ -233,7 +233,7 @@ class Cluster(object):
                     node = next(iter([n for n in self.nodes if n.name == node_config['node_name']]), None)
                     if node:
                         log.error('could not initialize node %s, terminating it', node.name)
-                        node.destroy()
+                        self.remove_by_name(node.name)
                     else:
                         raise NodeNotFound('could not find the node we tried to start, check the console')
         self.__dump()
@@ -248,12 +248,13 @@ class Cluster(object):
 
     def remove_by_name(self, name):
         self.__update_node_states()
+        provider = self.cloud.provider(storage_path=self.storage_path, **dict(self.cloud.options, **self.login.options))
         node = next(iter([n for n in self.nodes if n.name == name]), None)
         if not node:
             log.error('node %s not found as part of the current cluster (%s)', name, self.name)
             return
         log.debug('removing node %s from cluster %s', node.name, self.name)
-        node.destroy()
+        provider.stop_instance(node)
         self.nodes.remove(node)
         self.__dump(False)
 
@@ -352,11 +353,12 @@ class Cluster(object):
                             except socket.error as ex:
                                 log.debug("Host %s (%s) not reachable, retrying. (%s)", self.name, ip, ex)
                                 time.sleep(self.polling_interval)
-                    return ip, ssh_port
+                        return ip, ssh_port
                 except paramiko.SSHException as ex:
                     log.debug("Ignoring error %s while connecting to %s", str(ex), ip)
-                except paramiko.BadHostKeyException:
-                    log.error("Invalid host key: host %s (%s); check keyfile: %s", self.name, ip, key_file)
+                finally:
+                    if ssh:
+                        ssh.close()
         finally:
             if ssh:
                 ssh.close()

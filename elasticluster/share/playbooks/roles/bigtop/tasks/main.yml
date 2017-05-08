@@ -2,9 +2,8 @@
 ---
 
 
-- name: Set JAVA8 on experimental
+- name: Set JAVA8
   set_fact: java_version=8
-  when: bigtop_experimental
 
 
 - name: Check playbook compatibility with host platform

@@ -49,7 +49,7 @@ class Cluster(object):
     Initialization automatically tries to load any previous state
     """
     def __init__(self, storage_path, storage_type, template, name=None, cloud_instance=None, login_instance=None,
-                 setup_instance=None, **kwargs):
+                 setup_instance=None, group_specific_options=None, **options):
         self.storage_path = storage_path
         self.storage_type = storage_type
         self.template = template
@@ -57,13 +57,15 @@ class Cluster(object):
             self.name = name
         else:
             self.name = template
-        self.known_host_file = os.path.expandvars(os.path.expanduser(os.path.join(self.storage_path, '{}.known_hosts'.format(self.name))))
-        self.options = update_options(KEY_RENAMES, Schema(self.rules).validate(kwargs))
+        self.known_host_file = os.path.expandvars(os.path.expanduser(os.path.join(self.storage_path,
+                                                                                  '{}.known_hosts'.format(self.name))))
+        self.options = update_options(KEY_RENAMES, Schema(self.rules).validate(options))
         if log.very_verbose:
             log.debug('%s options: %s', self.name, dict(self.options))
         self.cloud = cloud_instance
         self.login = login_instance
         self.setup = setup_instance
+        self.group_specific_options = group_specific_options
         if os.path.exists(self.__storage_file_path()):
             self.__load(True)
 
@@ -207,6 +209,9 @@ class Cluster(object):
         provider = self.cloud.provider(storage_path=self.storage_path, **dict(self.cloud.options, **self.login.options))
         for x in range(node_index + 1, node_index + count + 1):
             node_config = dict(self.options, **self.login.options)
+            if node_type in self.group_specific_options.keys():
+                for k, v in self.group_specific_options[node_type].items():
+                    node_config[k] = v
             if self.template == self.name:
                 node_config['node_name'] = '{}-{}{:03}'.format(self.template, node_type, x)
             else:

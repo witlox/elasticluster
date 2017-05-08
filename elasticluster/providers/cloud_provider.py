@@ -194,6 +194,8 @@ class CloudProvider(object):
         if config.get('security_groups'):
             for sg in config.get('security_groups').split(','):
                 sgs.append(sg.strip())
+        if 'default' not in sgs:
+            sgs.append('default')
         for g in self.check_security_groups(set(sgs)):
             yield self.resolve_security_group(g)
 

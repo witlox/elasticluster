@@ -95,7 +95,18 @@ class Configuration(object):
 
     def get_cluster(self, template, name):
         log.debug('trying to get cluster %s configuration with template %s', name, template)
-        for cs in [s for s in self.parser.sections() if s.startswith(CLUSTER_PREFIX) and s[len(CLUSTER_PREFIX):] == template]:
+        group_specific_options = {}
+        for go in [s for s in self.parser.sections()
+                   if s.startswith(CLUSTER_PREFIX)
+                   and template in s[len(CLUSTER_PREFIX):]
+                   and len(s) > len(CLUSTER_PREFIX)+len(template)]:
+            group_name = go[len(CLUSTER_PREFIX)+len(template)+1:]
+            group_specific_options[group_name] = {}
+            log.debug('extra group options (%s) detected for %s', group_name, template)
+            for k, v in self.parser.items(go):
+                group_specific_options[group_name][k] = v
+        for cs in [s for s in self.parser.sections()
+                   if s.startswith(CLUSTER_PREFIX) and s[len(CLUSTER_PREFIX):] == template]:
             cloud = None
             login = None
             setup = None
@@ -108,11 +119,19 @@ class Configuration(object):
                 elif k == 'setup':
                     setup = next(self.get_setup(v), None)
                 options[k] = v
-            yield Cluster(self.storage_path, self.storage_type, template, name=name, cloud_instance=cloud,
-                          login_instance=login, setup_instance=setup, **options)
+            yield Cluster(self.storage_path,
+                          self.storage_type,
+                          template,
+                          name=name,
+                          cloud_instance=cloud,
+                          login_instance=login,
+                          setup_instance=setup,
+                          group_specific_options=group_specific_options,
+                          **options)
 
     def get_login(self, name):
-        for ls in [s for s in self.parser.sections() if s.startswith(LOGIN_PREFIX) and s[len(LOGIN_PREFIX):] == name]:
+        for ls in [s for s in self.parser.sections()
+                   if s.startswith(LOGIN_PREFIX) and s[len(LOGIN_PREFIX):] == name]:
             options = {}
             for k, v in self.parser.items(ls):
                 options[k] = v
@@ -120,13 +139,15 @@ class Configuration(object):
             yield Login(name, **options)
 
     def get_cloud(self, name):
-        for cs in [s for s in self.parser.sections() if s.startswith(CLOUD_PREFIX) and s[len(CLOUD_PREFIX):] == name]:
+        for cs in [s for s in self.parser.sections()
+                   if s.startswith(CLOUD_PREFIX) and s[len(CLOUD_PREFIX):] == name]:
             provider = None
             options = {}
             for k, v in self.parser.items(cs):
                 if k == 'provider':
                     if v not in CLOUD_PROVIDERS:
-                        raise ConfigurationError('Invalid value `{}` for `cloud provider` in configuration file.'.format(v))
+                        raise ConfigurationError('Invalid value `{}` for `cloud provider` '
+                                                 'in configuration file.'.format(v))
                     provider = CLOUD_PROVIDERS[v]
                 else:
                     options[k] = v
@@ -136,13 +157,15 @@ class Configuration(object):
             yield cloud
 
     def get_setup(self, name):
-        for ss in [s for s in self.parser.sections() if s.startswith(SETUP_PREFIX) and s[len(SETUP_PREFIX):] == name]:
+        for ss in [s for s in self.parser.sections()
+                   if s.startswith(SETUP_PREFIX) and s[len(SETUP_PREFIX):] == name]:
             provider = None
             options = {}
             for k, v in self.parser.items(ss):
                 if k == 'provider':
                     if v not in SETUP_PROVIDERS:
-                        raise ConfigurationError('Invalid value `{}` for `setup provider` in configuration file.'.format(v))
+                        raise ConfigurationError('Invalid value `{}` for `setup provider` '
+                                                 'in configuration file.'.format(v))
                     provider = SETUP_PROVIDERS[v]
                 else:
                     options[k] = v

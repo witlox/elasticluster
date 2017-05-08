@@ -22,12 +22,6 @@ import sys
 from elasticluster.configuration import Configuration
 from elasticluster.validate import hostname
 
-__author__ = ', '.join([
-    'Nicolas Baer <nicolas.baer@uzh.ch>',
-    'Antonio Messina <antonio.messina@s3it.uzh.ch>',
-    'Riccardo Murri <riccardo.murri@gmail.com>',
-])
-
 # stdlib imports
 from abc import ABCMeta, abstractmethod
 from fnmatch import fnmatch
@@ -76,10 +70,11 @@ class Start(AbstractCommand):
     """
     Create a new cluster using the given cluster template.
     """
+
     def __init__(self, subparsers):
         super(Start, self).__init__(subparsers)
         parser = subparsers.add_parser("start", description=self.__doc__, help="Create a cluster using the "
-                                                                                "supplied configuration.")
+                                                                               "supplied configuration.")
         parser.set_defaults(func=self)
         parser.add_argument('cluster', help="Type of cluster. It refers to a configuration stanza [cluster/<name>]")
         parser.add_argument('-n', '--name', dest='cluster_name', help="Name of the cluster.")
@@ -202,8 +197,8 @@ class ResizeCluster(AbstractCommand):
         parser.add_argument('-a', '--add', metavar='N1:GROUP1[,N2:GROUP2]', help="Add N1 nodes of group GROUP1, "
                                                                                  "N2 of group GROUP2 etc...")
         parser.add_argument('-r', '--remove', metavar='N1:GROUP1[,N2:GROUP2]', help="Remove the highest-numbered N1 "
-                                                                                    "nodes of group GROUP1, N2 of group "
-                                                                                    "GROUP2 etc...")
+                                                                                    "nodes of group GROUP1, N2 of group"
+                                                                                    " GROUP2 etc...")
         parser.add_argument('--no-setup', action="store_true", default=False, help="Only start the cluster, do not "
                                                                                    "configure it")
         parser.add_argument('--yes', action="store_true", default=False, help="Assume `yes` to all queries and do not "
@@ -331,7 +326,8 @@ class ListTemplates(AbstractCommand):
                 for template in [t for t in templates.keys() if fnmatch(t, pattern)]:
                     filtered_templates[template] = templates[template]
             templates = filtered_templates
-            log.info("%d cluster templates found matching pattern(s) '%s'", len(templates), str.join(", ", self.params.clusters))
+            log.info("%d cluster templates found matching pattern(s) '%s'", len(templates),
+                     str.join(", ", self.params.clusters))
 
         for template in templates.keys():
             print('\ntemplate: {}'.format(template))

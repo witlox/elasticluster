@@ -356,9 +356,6 @@ class Cluster(object):
                         return ip, ssh_port
                 except paramiko.SSHException as ex:
                     log.debug("Ignoring error %s while connecting to %s", str(ex), ip)
-                finally:
-                    if ssh:
-                        ssh.close()
         finally:
             if ssh:
                 ssh.close()

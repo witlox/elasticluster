@@ -92,7 +92,8 @@ class OpenStackCloudProvider(CloudProvider):
                                 'size': self.check_flavor(config.get('flavor')),
                                 'ex_userdata': config.get('image_userdata'),
                                 'ex_security_groups': self._get_security_groups(config),
-                                'networks': self._get_networks(config)})
+                                'networks': self._get_networks(config),
+                                'ex_keyname': self.key_name})
         if node:
             if config.get('request_floating_ip'):
                 self.allocate_floating_ip(node)

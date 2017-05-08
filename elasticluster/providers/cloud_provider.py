@@ -174,7 +174,7 @@ class CloudProvider(object):
             self.__import_pem(key_name, os.path.join(self.storage_path, '{}.pem'.format(key_name)), password)
 
     def _get_node(self, node):
-        return next([n for n in self.driver.list_nodes() if n.id == node.id], None)
+        return next(iter([n for n in self.driver.list_nodes() if n.id == node.id]), None)
 
     def _get_networks(self, config):
         networks = []

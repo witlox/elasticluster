@@ -52,25 +52,13 @@ class OpenStackCloudProvider(CloudProvider):
                                 ex_tenant_name=self.project_name,
                                 ex_force_auth_version='2.0_password')
 
-    def list_security_groups(self):
-        for sg in self.driver.ex_list_security_groups():
-            yield sg.name
-
-    def resolve_security_group(self, security_group_name):
-        for sg in self.driver.ex_list_security_groups():
-            if sg.name == security_group_name:
-                return sg
-
-    def resolve_network(self, network_id):
-        for ne in self.driver.ex_list_networks():
-            if ne.id == network_id:
-                return ne
+    def _get_ip_pool(self):
+        return next(iter(self.driver.ex_list_floating_ip_pools()), None)
 
     def deallocate_floating_ip(self, node):
-        floating = self.attached_floating_ips(node)
-        if floating:
-            pool = self._get_ip_pool()
-            for ip in floating:
+        pool = self._get_ip_pool()
+        if pool:
+            for ip in list(set(self.driver.ex_list_floating_ips()) & set(node.public_ips + node.private_ips)):
                 self.driver.ex_detach_floating_ip_from_node(node, ip)
                 pool.ex_delete_floating_ip(ip)
 
@@ -82,22 +70,11 @@ class OpenStackCloudProvider(CloudProvider):
         else:
             log.warn('could not locate default ip pool, assignment of floating IP failed')
 
-    def attached_floating_ips(self, node):
-        return list(set(self.driver.ex_list_floating_ips()) & set(node.public_ips + node.private_ips))
-
     def start_instance(self, **config):
-        super(OpenStackCloudProvider, self).start_instance(**config)
-        node = self.start_node({'name': config.get('node_name'),
-                                'image': self.check_image(config.get('image_id')),
-                                'size': self.check_flavor(config.get('flavor')),
-                                'ex_userdata': config.get('image_userdata'),
-                                'ex_security_groups': self._get_security_groups(config),
-                                'networks': self._get_networks(config),
-                                'ex_keyname': self.key_name})
+        config = super(OpenStackCloudProvider, self).start_instance(**config)
+        config['ex_keyname'] = self.key_name
+        node = self.start_node(config)
         if node:
             if config.get('request_floating_ip'):
                 self.allocate_floating_ip(node)
         return node
-
-    def _get_ip_pool(self):
-        return next(self.driver.ex_list_floating_ip_pools(), None)

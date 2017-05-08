@@ -14,8 +14,8 @@ class Login(object):
              Optional('image_user_sudo', default="root"): nonempty_str,
              Optional('image_userdata', default=''): str}
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name, **options):
         self.name = name
-        self.options = Schema(self.rules).validate(kwargs)
+        self.options = Schema(self.rules).validate(options)
         if log.very_verbose:
             log.debug('%s options: %s', self.name, dict(self.options))

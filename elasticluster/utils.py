@@ -62,9 +62,8 @@ def confirm_or_abort(prompt, exitcode=os.EX_TEMPFAIL, msg=None, **extra_args):
         sys.exit(exitcode)
 
 
-def key_warn(old, new):
-    logging.warn('found old key {} in configuration, please replace with new key {} '
-                 '(changing config parameter so we can continue)'.format(old, new), DeprecationWarning)
+def key_warn(o, n):
+    warnings.warn('found old key {} in configuration, please replace with new key {}'.format(o, n), DeprecationWarning)
 
 
 def update_options(renames, options):
@@ -72,7 +71,10 @@ def update_options(renames, options):
     for k, v in options.items():
         original, rename = next(iter([(o, r) for o, r in renames if re.match(o, k)]), (None, None))
         if original:
-            to_key = re.sub(rename, "", k)
+            if k == original:
+                to_key = rename
+            else:
+                to_key = re.sub(original, "", rename)
             key_warn(k, to_key)
             updated_options[to_key] = v
         else:

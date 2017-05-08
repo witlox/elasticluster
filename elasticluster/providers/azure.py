@@ -40,25 +40,16 @@ class AzureCloudProvider(CloudProvider):
         self.driver = Azure(subscription_id=config.get('subscription_id'),
                             key_file=os.path.expandvars(os.path.expanduser(config.get('key_file'))))
 
-    def resolve_network(self, network_id):
-        pass
-
     def deallocate_floating_ip(self, node):
         pass
 
     def allocate_floating_ip(self, node):
         pass
 
-    def resolve_security_group(self, security_group_name):
-        pass
-
-    def list_security_groups(self):
-        pass
-
     def start_instance(self, boot_disk_size=10, tags=None, scheduling=None, **config):
         super(AzureCloudProvider, self).start_instance(**config)
         node = self.start_node({'name': config.get('node_name'),
-                                'image': self.check_image(config.get('image_id')),
-                                'size': self.check_flavor(config.get('flavor')),
+                                'image': config.get('image'),
+                                'size': config.get('flavor'),
                                 'ex_cloud_service_name': AZURE_CLOUD_SERVICE_NAME})
         return node

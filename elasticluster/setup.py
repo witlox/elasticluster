@@ -28,9 +28,9 @@ class Setup(object):
              # allow other keys w/out restrictions
              Optional(str): str}
 
-    def __init__(self, name, **kwargs):
+    def __init__(self, name, **options):
         self.name = name
-        self.options = update_options(KEY_RENAMES, Schema(self.rules).validate(kwargs))
+        self.options = Schema(self.rules).validate(update_options(KEY_RENAMES, options))
         updated_options = {}
         for k, v in self.options.items():
             if '_groups' in k and k.split('_groups')[0] in [rng for rng in RENAMED_NODE_GROUPS.keys()]:

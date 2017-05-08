@@ -45,9 +45,6 @@ class AwsCloudProvider(CloudProvider):
                           config.get('secret_key'),
                           region=config.get('region'))
 
-    def resolve_network(self, network_id):
-        pass
-
     def deallocate_floating_ip(self, node):
         eips = self.driver.ex_describe_addresses_for_node(node)
         if eips:
@@ -59,21 +56,13 @@ class AwsCloudProvider(CloudProvider):
         elastic_ip = self.driver.ex_allocate_address()
         self.driver.ex_associate_address_with_node(node, elastic_ip)
 
-    def resolve_security_group(self, security_group_name):
-        for sg in self.driver.ex_list_security_groups():
-            if sg.name == security_group_name:
-                return sg
-
-    def list_security_groups(self):
-        return self.driver.ex_list_security_groups()
-
     def start_instance(self, **config):
         super(AwsCloudProvider, self).start_instance(**config)
         node = self.start_node({'name': config.get('node_name'),
-                                'image': self.check_image(config.get('image_id')),
-                                'size': self.check_flavor(config.get('flavor')),
+                                'image': config.get('image'),
+                                'size': config.get('flavor'),
                                 'ex_userdata': config.get('image_userdata'),
-                                'ex_security_groups': self._get_security_groups(config),
+                                'ex_security_groups': config.get('security_groups'),
                                 'ex_iamprofile': config.get('iam_profile'),
                                 'ex_assign_public_ip': config.get('public_ip')})
 

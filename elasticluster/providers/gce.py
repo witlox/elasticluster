@@ -37,7 +37,7 @@ class GoogleCloudProvider(CloudProvider):
         "gce_client_id": nonempty_str,
         "gce_client_secret": nonempty_str,
         "gce_project_id": nonempty_str,
-        Optional("zone", default="us-central1-a"): nonempty_str,
+        Optional("location", default="us-central1-a"): nonempty_str,
     }
 
     def __init__(self, **config):
@@ -52,21 +52,10 @@ class GoogleCloudProvider(CloudProvider):
                                     datacenter=config.get('zone'),
                                     project=self.project_name)
 
-    def resolve_network(self, network_id):
-        for ne in self.driver.ex_list_networks():
-            if ne.id == network_id:
-                return ne
-
     def deallocate_floating_ip(self, node):
         pass
 
     def allocate_floating_ip(self, node):
-        pass
-
-    def resolve_security_group(self, security_group_name):
-        pass
-
-    def list_security_groups(self):
         pass
 
     def start_instance(self, boot_disk_size=10, tags=None, scheduling=None, **config):
@@ -76,11 +65,11 @@ class GoogleCloudProvider(CloudProvider):
             for email in config.get('email').split(','):
                 service_accounts.append({'email': email.strip(), 'scopes': GCE_DEFAULT_SCOPES})
         node = self.start_node({'name': config.get('node_name'),
-                                'image': self.check_image(config.get('image_id')),
-                                'size': self.check_flavor(config.get('flavor')),
+                                'image': config.get('image'),
+                                'size': config.get('flavor'),
                                 'location': config.get('zone'),
-                                'ex_network': self._get_networks(config),
                                 'external_ip': config.get('external_ip'),
+                                'ex_network': config.get('networks'),
                                 'ex_tags': config.get('tags'),
                                 'ex_boot_disk': config.get('boot_disk'),
                                 'ex_disk_type': config.get('disk_type'),

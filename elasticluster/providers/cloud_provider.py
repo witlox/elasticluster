@@ -20,15 +20,18 @@ import os
 from tempfile import NamedTemporaryFile
 
 import paramiko
-
 from libcloud.compute.base import NodeAuthSSHKey, NodeAuthPassword
 from libcloud.compute.types import NodeState
 from paramiko import SSHException
 
 from elasticluster import log
-from elasticluster.exceptions import SecurityGroupError, ConfigurationError, KeypairError
+from elasticluster.exceptions import ConfigurationError, KeypairError
 
 Driver = None
+
+EXPLICIT_CONFIG = [
+    'floating_ip'
+]
 
 
 class CloudProvider(object):
@@ -47,10 +50,6 @@ class CloudProvider(object):
         self.key_name = config.get('user_key_name')
 
     @abc.abstractmethod
-    def resolve_network(self, network_id):
-        pass
-
-    @abc.abstractmethod
     def allocate_floating_ip(self, node):
         pass
 
@@ -59,23 +58,28 @@ class CloudProvider(object):
         pass
 
     @abc.abstractmethod
-    def resolve_security_group(self, security_group_name):
-        pass
-
-    @abc.abstractmethod
-    def list_security_groups(self):
-        pass
-
-    @abc.abstractmethod
     def start_instance(self, **config):
-        self.prepare_key_pair(config.get('user_key_name'),
-                              config.get('user_key_private'),
-                              config.get('user_key_public'),
-                              config.get('image_user_password'))
+        self._prepare_key_pair(config.get('user_key_name'),
+                               config.get('user_key_private'),
+                               config.get('user_key_public'),
+                               config.get('image_user_password'))
         if self.driver.get_key_pair(config.get('user_key_name')):
-            self.auth = NodeAuthSSHKey(self.driver.get_key_pair(config.get('user_key_name')).public_key)
+            config['auth'] = NodeAuthSSHKey(self.driver.get_key_pair(config.get('user_key_name')).public_key)
         else:
-            self.auth = NodeAuthPassword(config.get('image_user_password'))
+            config['auth'] = NodeAuthPassword(config.get('image_user_password'))
+
+        for key in [k for k in config.keys() if k not in EXPLICIT_CONFIG]:
+            list_function = next(self.__check_list_function(key), None)
+            if list_function:
+                populated_list = self.__check_name_or_id(config[key], list_function())
+                if populated_list and len(populated_list) > 0:
+                    if key.endswith('s'):
+                        config[key] = populated_list
+                    else:
+                        config[key] = populated_list[0]
+        if log.very_verbose:
+            log.debug(dict(config))
+        return config
 
     def list_nodes(self):
         return self.driver.list_nodes()
@@ -87,7 +91,7 @@ class CloudProvider(object):
             node.destroy()
 
     def start_node(self, config):
-        config['auth'] = self.auth
+        print(config)
         node = self.driver.create_node(**config)
         if self.floating_ip:
             self.allocate_floating_ip(node)
@@ -105,38 +109,17 @@ class CloudProvider(object):
             return node.public_ips + node.private_ips
         return list()
 
-    def check_security_groups(self, security_groups):
-        for g in security_groups:
-            if g not in self.list_security_groups():
-                raise SecurityGroupError("the specified security group %s does not exist" % g)
-        return security_groups
+    def _get_node(self, node):
+        return next(iter([n for n in self.driver.list_nodes() if n.id == node.id]), None)
 
-    def check_flavor(self, flavor):
-        return next(iter([fl for fl in self.driver.list_sizes() if fl.name == flavor]), None)
-
-    def check_image(self, image_id):
-        return next(iter([i for i in self.driver.list_images() if i.id == image_id]), None)
-
-    def list_key_pairs(self):
+    def __import_pem(self, kf, key_name, pem_file_path, password):
         try:
-            key_pairs = self.driver.list_keypairs()
-        except AttributeError:
-            key_pairs = self.driver.ex_list_keypairs()
-        for kp in key_pairs:
-            yield kp.name
-
-    def import_key_from_file(self, name, public_key):
-        try:
-            self.driver.import_key_pair_from_file(name, public_key)
-        except AttributeError:
-            self.driver.ex_import_key_pair_from_file(name, public_key)
-
-    def __import_pem(self, key_name, pem_file_path, password):
-        try:
-            pem = paramiko.RSAKey.from_private_key_file(os.path.expandvars(os.path.expanduser(pem_file_path)), password)
+            pem = paramiko.RSAKey.from_private_key_file(os.path.expandvars(os.path.expanduser(pem_file_path)),
+                                                        password)
         except SSHException:
             try:
-                pem = paramiko.DSSKey.from_private_key_file(os.path.expandvars(os.path.expanduser(pem_file_path)), password)
+                pem = paramiko.DSSKey.from_private_key_file(os.path.expandvars(os.path.expanduser(pem_file_path)),
+                                                            password)
             except SSHException:
                 raise KeypairError('could not import %s in rsa or dss format', pem_file_path)
         if not pem:
@@ -144,58 +127,69 @@ class CloudProvider(object):
         else:
             f = NamedTemporaryFile('w+t')
             f.write('{} {}'.format(pem.get_name(), pem.get_base64()))
-            self.import_key_from_file(key_name, f.name)
+            kf(name=key_name, key_file_path=f.name)
             f.close()
 
-    def prepare_key_pair(self, key_name, private_key_path, public_key_path, password):
+    def _prepare_key_pair(self, key_name, private_key_path, public_key_path, password):
+        list_keys = next(self.__check_list_function('key_pairs'), None)
+        if not list_keys:
+            log.warn('key management not supported by provider')
+            return
         if not key_name:
             log.warn('user_key_name has not been defined, assuming password based authentication')
             return
         log.debug("Checking key pair `%s` ...", key_name)
-        if key_name in self.list_key_pairs():
+        if key_name in [k.name for k in list_keys()]:
             log.debug('Key pair is already installed.')
             return
         log.debug("Key pair `%s` not found, installing it.", key_name)
+        kf, _ = self.__function_or_ex_function('import_key_pair_from_file')
+        if not kf:
+            log.warn('key import not supported by provider')
+            return
         if public_key_path:
             log.debug("importing public key from path %s", public_key_path)
-            self.import_key_from_file(key_name, os.path.expandvars(os.path.expanduser(public_key_path)))
+            if not kf(name=key_name, key_file_path=os.path.expandvars(os.path.expanduser(public_key_path))):
+                log.error('cannot import public key')
         elif private_key_path:
             if not private_key_path.endswith('.pem'):
                 raise ConfigurationError('can only work with .pem private keys, '
                                          'derive public key and set user_key_public')
             log.debug("deriving and importing public key from private key")
-            self.__import_pem(key_name, private_key_path, password)
+            self.__import_pem(kf, key_name, private_key_path, password)
         elif os.path.exists(os.path.join(self.storage_path, '{}.pem'.format(key_name))):
-            self.__import_pem(key_name, os.path.join(self.storage_path, '{}.pem'.format(key_name)), password)
+            self.__import_pem(kf, key_name, os.path.join(self.storage_path, '{}.pem'.format(key_name)), password)
         else:
             key_pair = self.driver.create_key_pair(name=key_name)
             with open(os.path.join(self.storage_path, '{}.pem'.format(key_name)), 'w') as new_key_file:
                 new_key_file.write(key_pair)
-            self.__import_pem(key_name, os.path.join(self.storage_path, '{}.pem'.format(key_name)), password)
+            self.__import_pem(kf, key_name, os.path.join(self.storage_path, '{}.pem'.format(key_name)), password)
 
-    def _get_node(self, node):
-        return next(iter([n for n in self.driver.list_nodes() if n.id == node.id]), None)
+    """
+    Check if a list function exists for a key on a driver
+    """
+    def __check_list_function(self, func):
+        for lf in [getattr(self.driver, c, None) for c in dir(self.driver) if 'list_{}'.format(func) in c]:
+            yield lf
 
-    def _get_networks(self, config):
-        networks = []
-        if 'network_ids' in config:
-            network_ids = [net_id.strip() for net_id in config['network_ids'].split(',')]
-            for network_id in network_ids:
-                network = self.resolve_network(network_id)
-                log.debug('attaching network (%s) as %s', network_id, network)
-                networks.append(network)
-        return networks
+    """
+    Check if a function exists for a key on a driver, or if it is an 'extended' function.
+    :returns tuple of callable and key name
+    """
+    def __function_or_ex_function(self, func):
+        if func in dir(self.driver):
+            return getattr(self.driver, func, None), func
+        elif 'ex_{}'.format(func) in dir(self.driver):
+            return getattr(self.driver, 'ex_'.format(func), None), 'ex_'.format(func)
+        return None, None
 
-    def _get_security_groups(self, config):
-        sgs = []
-        if config.get('security_group'):
-            for sg in config.get('security_group').split(','):
-                sgs.append(sg.strip())
-        if config.get('security_groups'):
-            for sg in config.get('security_groups').split(','):
-                sgs.append(sg.strip())
-        if 'default' not in sgs:
-            sgs.append('default')
-        for g in self.check_security_groups(set(sgs)):
-            yield self.resolve_security_group(g)
-
+    """
+    Check if a value chain (ex. 'a,b,c') exists in our list of known items
+    """
+    @staticmethod
+    def __check_name_or_id(values, known):
+        result = []
+        for element in [e.strip() for e in values.split(',')]:
+            for item in [i for i in known if i.name == element or i.id == element]:
+                    result.append(item)
+        return result

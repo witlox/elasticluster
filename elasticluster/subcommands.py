@@ -381,7 +381,8 @@ class ListNodes(AbstractCommand):
                 print('- name         : {}\n'
                       '  state        : {}\n'
                       '  ip addresses : {}\n'
-                      '  id           : {}\n'.format(node.name, node.state, ips, node.id))
+                      '  id           : {}\n'
+                      '  flavor       : {}\n'.format(node.name, node.state, ips, node.id, node.size))
             print('-------------------------')
 
 

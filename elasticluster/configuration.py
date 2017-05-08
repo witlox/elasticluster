@@ -60,8 +60,8 @@ class Configuration(object):
                               **{'cloud': 'none',
                                  'login': 'none',
                                  'setup': 'none',
-                                 'flavor': 'none',
-                                 'image_id': 'none'})
+                                 'size': 'none',
+                                 'image': 'none'})
             if cluster and cluster.template:
                 for c in configuration.get_cluster(cluster.template, name):
                     yield c

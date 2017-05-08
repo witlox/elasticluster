@@ -24,20 +24,23 @@ def raise_timeout_error(signum, frame):
 
 
 KEY_RENAMES = [(r'([0-9a-z_-]+)_min_nodes', r'\1_nodes_min'),
-               ('setup_provider', 'setup')]
+               ('setup_provider', 'setup'),
+               ('flavor', 'size'),
+               ('image_id', 'image'),
+               ('network_ids', 'networks'),
+               ('security_group', 'security_groups')]
 
 
 class Cluster(object):
     rules = {'cloud': str,
              'setup': str,
              'login': str,
-             'flavor': nonempty_str,
-             'image_id': nonempty_str,
+             'size': nonempty_str,
+             'image': nonempty_str,
              Optional('floating_ip', default=False): boolean,
-             Optional('security_group'): str,
              Optional('security_groups'): str,
              Optional('image_userdata', default=''): str,
-             Optional('network_ids'): str,
+             Optional('networks'): str,
              # allow other keys w/out restrictions
              Optional(str): str}
     nodes = []
@@ -59,7 +62,7 @@ class Cluster(object):
             self.name = template
         self.known_host_file = os.path.expandvars(os.path.expanduser(os.path.join(self.storage_path,
                                                                                   '{}.known_hosts'.format(self.name))))
-        self.options = update_options(KEY_RENAMES, Schema(self.rules).validate(options))
+        self.options = Schema(self.rules).validate(update_options(KEY_RENAMES, options))
         if log.very_verbose:
             log.debug('%s options: %s', self.name, dict(self.options))
         self.cloud = cloud_instance
@@ -213,10 +216,10 @@ class Cluster(object):
                 for k, v in self.group_specific_options[node_type].items():
                     node_config[k] = v
             if self.template == self.name:
-                node_config['node_name'] = '{}-{}{:03}'.format(self.template, node_type, x)
+                node_config['name'] = '{}-{}{:03}'.format(self.template, node_type, x)
             else:
-                node_config['node_name'] = '{}-{}{:03}'.format(self.name, node_type, x)
-            log.info('adding node %s to cluster %s', node_config['node_name'], self.name)
+                node_config['name'] = '{}-{}{:03}'.format(self.name, node_type, x)
+            log.info('adding node %s to cluster %s', node_config['name'], self.name)
             self.nodes.append(provider.start_instance(**node_config))
             if wait:
                 try:
@@ -224,9 +227,9 @@ class Cluster(object):
                         node_up = False
                         while not node_up:
                             self.__update_node_states()
-                            node = next(iter([n for n in self.nodes if n.name == node_config['node_name']]), None)
+                            node = next(iter([n for n in self.nodes if n.name == node_config['name']]), None)
                             if not node:
-                                log.error('something went wrong while trying to start %s!', node_config['node_name'])
+                                log.error('something went wrong while trying to start %s!', node_config['name'])
                                 raise NodeNotFound
                             else:
                                 log.debug('%s status: %s', node.name, node.state)
@@ -235,7 +238,7 @@ class Cluster(object):
                                 else:
                                     node_up = True
                 except TimeoutError:
-                    node = next(iter([n for n in self.nodes if n.name == node_config['node_name']]), None)
+                    node = next(iter([n for n in self.nodes if n.name == node_config['name']]), None)
                     if node:
                         log.error('could not initialize node %s, terminating it', node.name)
                         self.remove_by_name(node.name)

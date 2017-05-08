@@ -8,9 +8,9 @@ KEY_RENAMES = [('tenant_name', 'project_name')]
 
 
 class Cloud(object):
-    def __init__(self, name, rules, **kwargs):
+    def __init__(self, name, rules, **options):
         self.name = name
-        self.options = update_options(KEY_RENAMES, Schema(rules).validate(kwargs))
+        self.options = Schema(rules).validate(update_options(KEY_RENAMES, options))
         if log.very_verbose:
             log.debug('%s options: %s', self.name, dict(self.options))
 

@@ -80,7 +80,7 @@ class CloudProvider(object):
                         config[key] = populated_list[0]
 
         if log.very_verbose:
-            log.debug(dict(config))
+            log.debug('parsed config options: %s', dict(config))
 
         return config
 

@@ -61,11 +61,14 @@ class Cluster(object):
             self.name = name
         else:
             self.name = template
-        self.known_host_file = os.path.expandvars(os.path.expanduser(os.path.join(self.storage_path,
-                                                                                  '{}.known_hosts'.format(self.name))))
+        self.known_host_file = os.path.expandvars(
+            os.path.expanduser(
+                os.path.join(self.storage_path, '{}.known_hosts'.format(self.name))
+            )
+        )
         self.options = Schema(self.rules).validate(update_options(KEY_RENAMES, options))
         if log.very_verbose:
-            log.debug('%s options: %s', self.name, dict(self.options))
+            log.debug('cluster %s options: %s', self.name, dict(self.options))
         self.cloud = cloud_instance
         self.login = login_instance
         self.setup = setup_instance
@@ -278,7 +281,7 @@ class Cluster(object):
                 groups[node_type].append(group)
         log.debug('going to deploy groups: %s', dict(groups))
         environment_vars = {}
-        for group in node_types:
+        for group in groups.keys():
             environment_vars[group] = {}
             for key, value in local_options.items():
                 for prefix in ['{}_var_'.format(group), 'global_var_']:
@@ -286,7 +289,6 @@ class Cluster(object):
                         var = key.replace(prefix, '')
                         log.debug("setting variable %s=%s for node type %s", var, value, group)
                         environment_vars[group][var] = value
-                        local_options.pop(key)
         playbook_path = local_options.pop('playbook_path')
         sudo = True
         if self.login.options.get('image_sudo'):

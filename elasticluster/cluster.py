@@ -110,11 +110,13 @@ class Cluster(object):
             previous_state = list(self.nodes)
             provider = self.cloud.provider(storage_path=self.storage_path, **dict(self.cloud.options, **self.login.options))
             self.nodes = [pn for pn in provider.list_nodes() if pn.name in [n.name for n in self.nodes]]
+            images = provider.list_images()
+            sizes = provider.list_sizes()
             for node in self.nodes:
                 if not node.image and node.extra and node.extra.get('imageId'):
-                    node.image = next(iter([i for i in provider.list_images() if i.id == node.extra.get('imageId')]), None)
+                    node.image = next(iter([i for i in images if i.id == node.extra.get('imageId')]), None)
                 if not node.size and node.extra and node.extra.get('flavorId'):
-                    node.size = next(iter([s for s in provider.list_sizes() if s.id == node.extra.get('flavorId')]), None)
+                    node.size = next(iter([s for s in sizes if s.id == node.extra.get('flavorId')]), None)
                 log.debug('got node %s (size: %s, image: %s)', node, node.size, node.image)
             # sanity check
             for node in previous_state:

@@ -84,6 +84,12 @@ class CloudProvider(object):
 
         return config
 
+    def list_images(self):
+        return self.driver.list_images()
+
+    def list_sizes(self):
+        return self.driver.list_sizes()
+
     def list_nodes(self):
         return self.driver.list_nodes()
 
@@ -94,7 +100,6 @@ class CloudProvider(object):
             node.destroy()
 
     def start_node(self, config):
-        print(config)
         node = self.driver.create_node(**config)
         if self.floating_ip:
             self.allocate_floating_ip(node)

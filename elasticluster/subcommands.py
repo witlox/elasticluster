@@ -376,7 +376,7 @@ class ListNodes(AbstractCommand):
             print(cluster)
             print('Details of nodes:')
             print('-------------------------')
-            for node in cluster.nodes:
+            for node in sorted(cluster.nodes, key=lambda n: n.name):
                 ips = ', '.join(node.private_ips + node.public_ips)
                 print('- name         : {}\n'
                       '  state        : {}\n'

@@ -67,7 +67,7 @@ class Cluster(object):
             )
         )
         self.options = Schema(self.rules).validate(update_options(KEY_RENAMES, options))
-        if log.very_verbose:
+        if log.very_verbose and self.name and self.options:
             log.debug('cluster %s options: %s', self.name, dict(self.options))
         self.cloud = cloud_instance
         self.login = login_instance
@@ -105,18 +105,39 @@ class Cluster(object):
             return os.path.join(self.storage_path, '{}.{}'.format(self.template, self.storage_type))
         return os.path.join(self.storage_path, '{}.{}'.format(self.name, self.storage_type))
 
+    __images = None
+
+    def __get_images(self):
+        if not self.__images:
+            provider = self.cloud.provider(storage_path=self.storage_path,
+                                           **dict(self.cloud.options, **self.login.options))
+            self.__images = provider.list_images()
+        return self.__images
+
+    __sizes = None
+
+    def __get_sizes(self):
+        if not self.__sizes:
+            provider = self.cloud.provider(storage_path=self.storage_path,
+                                           **dict(self.cloud.options, **self.login.options))
+            self.__sizes = provider.list_sizes()
+        return self.__sizes
+
     def __update_node_states(self):
         if self.cloud and self.cloud.provider:
             previous_state = list(self.nodes)
-            provider = self.cloud.provider(storage_path=self.storage_path, **dict(self.cloud.options, **self.login.options))
+            provider = self.cloud.provider(storage_path=self.storage_path,
+                                           **dict(self.cloud.options, **self.login.options))
             self.nodes = [pn for pn in provider.list_nodes() if pn.name in [n.name for n in self.nodes]]
-            images = provider.list_images()
-            sizes = provider.list_sizes()
             for node in self.nodes:
-                if not node.image and node.extra and node.extra.get('imageId'):
-                    node.image = next(iter([i for i in images if i.id == node.extra.get('imageId')]), None)
-                if not node.size and node.extra and node.extra.get('flavorId'):
-                    node.size = next(iter([s for s in sizes if s.id == node.extra.get('flavorId')]), None)
+                if not node.image and node.extra and node.extra.get('imageId') and self.__get_images():
+                    image = next(iter([i for i in self.__get_images() if i.id and i.id == node.extra.get('imageId')]), None)
+                    if image:
+                        node.image = image.name
+                if not node.size and node.extra and node.extra.get('flavorId') and self.__get_sizes():
+                    size = next(iter([s for s in self.__get_sizes() if s.id and s.id == node.extra.get('flavorId')]), None)
+                    if size:
+                        node.size = size.name
                 log.debug('got node %s (size: %s, image: %s)', node, node.size, node.image)
             # sanity check
             for node in previous_state:
@@ -132,6 +153,9 @@ class Cluster(object):
                 data = json.loads(sf)
             else:
                 data = pickle.loads(sf)
+        if not data:
+            log.error('cannot load configuration for %s (%s)', self.name, self.__storage_file_path())
+            return
         self.template = data.get('template')
         self.name = data.get('name')
         if not self.options:
@@ -139,9 +163,15 @@ class Cluster(object):
         self.nodes = []
         for node in data.get('nodes'):
             try:
-                self.nodes.append(Node(node.get('id'), node.get('name'), node.get('state'), node.get('public_ips'),
-                                       node.get('private_ips'), node.get('size'), node.get('created_at'),
-                                       node.get('image'), node.get('extra')))
+                self.nodes.append(Node(node.get('id'),
+                                       node.get('name'),
+                                       node.get('state'),
+                                       node.get('public_ips'),
+                                       node.get('private_ips'),
+                                       node.get('size'),
+                                       node.get('created_at'),
+                                       node.get('image'),
+                                       node.get('extra')))
             except AttributeError:
                 for active in data['nodes'][node]:
                     node_name = '{}-{}'.format(active['cluster_name'], active['name'])

@@ -387,8 +387,8 @@ class ListNodes(AbstractCommand):
                                                      node.state,
                                                      ips,
                                                      node.id,
-                                                     node.size.name,
-                                                     node.image.name))
+                                                     node.size,
+                                                     node.image))
             print('-------------------------')
 
 

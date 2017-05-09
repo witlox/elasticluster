@@ -365,7 +365,7 @@ class ListNodes(AbstractCommand):
         """
         cluster = Configuration.find(self.params.config, self.params.cluster, self.params.storage)
         if not cluster:
-            log.error("Remove node from cluster `%s`, no active configuration found", self.params.cluster)
+            log.error("List nodes from cluster `%s`, no active configuration found", self.params.cluster)
             return os.EX_NOINPUT
 
         if self.params.pretty_json:

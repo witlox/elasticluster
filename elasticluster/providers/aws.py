@@ -63,4 +63,4 @@ class AwsCloudProvider(CloudProvider):
         node = self.start_node(running_config)
         if self.floating_ip:
             self.allocate_floating_ip(node)
-        return node.id
+        return node

@@ -63,6 +63,7 @@ class CloudProvider(object):
                                config.get('user_key_private'),
                                config.get('user_key_public'),
                                config.get('image_user_password'))
+
         if self.driver.get_key_pair(config.get('user_key_name')):
             config['auth'] = NodeAuthSSHKey(self.driver.get_key_pair(config.get('user_key_name')).public_key)
         else:
@@ -77,8 +78,10 @@ class CloudProvider(object):
                         config[key] = populated_list
                     else:
                         config[key] = populated_list[0]
+
         if log.very_verbose:
             log.debug(dict(config))
+
         return config
 
     def list_nodes(self):
@@ -112,58 +115,38 @@ class CloudProvider(object):
     def _get_node(self, node):
         return next(iter([n for n in self.driver.list_nodes() if n.id == node.id]), None)
 
-    def __import_pem(self, kf, key_name, pem_file_path, password):
-        try:
-            pem = paramiko.RSAKey.from_private_key_file(os.path.expandvars(os.path.expanduser(pem_file_path)),
-                                                        password)
-        except SSHException:
-            try:
-                pem = paramiko.DSSKey.from_private_key_file(os.path.expandvars(os.path.expanduser(pem_file_path)),
-                                                            password)
-            except SSHException:
-                raise KeypairError('could not import %s in rsa or dss format', pem_file_path)
-        if not pem:
-            raise KeypairError('could not import %s', pem_file_path)
-        else:
-            f = NamedTemporaryFile('w+t')
-            f.write('{} {}'.format(pem.get_name(), pem.get_base64()))
-            kf(name=key_name, key_file_path=f.name)
-            f.close()
-
     def _prepare_key_pair(self, key_name, private_key_path, public_key_path, password):
-        list_keys = next(self.__check_list_function('key_pairs'), None)
-        if not list_keys:
-            log.warn('key management not supported by provider')
-            return
         if not key_name:
             log.warn('user_key_name has not been defined, assuming password based authentication')
             return
-        log.debug("Checking key pair `%s` ...", key_name)
-        if key_name in [k.name for k in list_keys()]:
-            log.debug('Key pair is already installed.')
+
+        if not next(self.__check_list_function('key_pairs'), None):
+            raise KeypairError('key management not supported by provider')
+        if not self.__function_or_ex_function('import_key_pair_from_file'):
+            raise KeypairError('key import not supported by provider')
+        if not self.__function_or_ex_function('create_key_pair'):
+            raise KeypairError('key creation not supported by provider')
+
+        if key_name in [k.name for k in next(self.__check_list_function('key_pairs'))()]:
+            log.info('Key pair (%s) is already installed.', key_name)
             return
-        log.debug("Key pair `%s` not found, installing it.", key_name)
-        kf, _ = self.__function_or_ex_function('import_key_pair_from_file')
-        if not kf:
-            log.warn('key import not supported by provider')
-            return
+
         if public_key_path:
             log.debug("importing public key from path %s", public_key_path)
-            if not kf(name=key_name, key_file_path=os.path.expandvars(os.path.expanduser(public_key_path))):
-                log.error('cannot import public key')
+            key_import = self.__function_or_ex_function('import_key_pair_from_file')
+            if not key_import(name=key_name, key_file_path=os.path.expandvars(os.path.expanduser(public_key_path))):
+                raise KeypairError('failure during import of public key %s', public_key_path)
         elif private_key_path:
             if not private_key_path.endswith('.pem'):
-                raise ConfigurationError('can only work with .pem private keys, '
-                                         'derive public key and set user_key_public')
+                raise KeypairError('can only work with .pem private keys, derive public key and set user_key_public')
             log.debug("deriving and importing public key from private key")
-            self.__import_pem(kf, key_name, private_key_path, password)
+            self.__import_pem(key_name, private_key_path, password)
         elif os.path.exists(os.path.join(self.storage_path, '{}.pem'.format(key_name))):
-            self.__import_pem(kf, key_name, os.path.join(self.storage_path, '{}.pem'.format(key_name)), password)
+            self.__import_pem(key_name, os.path.join(self.storage_path, '{}.pem'.format(key_name)), password)
         else:
-            key_pair = self.driver.create_key_pair(name=key_name)
             with open(os.path.join(self.storage_path, '{}.pem'.format(key_name)), 'w') as new_key_file:
-                new_key_file.write(key_pair)
-            self.__import_pem(kf, key_name, os.path.join(self.storage_path, '{}.pem'.format(key_name)), password)
+                new_key_file.write(self.__function_or_ex_function('create_key_pair')(name=key_name))
+            self.__import_pem(key_name, os.path.join(self.storage_path, '{}.pem'.format(key_name)), password)
 
     """
     Check if a list function exists for a key on a driver
@@ -174,17 +157,37 @@ class CloudProvider(object):
 
     """
     Check if a function exists for a key on a driver, or if it is an 'extended' function.
-    :returns tuple of callable and key name
+    :returns a callable or none
     """
     def __function_or_ex_function(self, func):
         if func in dir(self.driver):
             return getattr(self.driver, func, None), func
         elif 'ex_{}'.format(func) in dir(self.driver):
-            return getattr(self.driver, 'ex_'.format(func), None), 'ex_'.format(func)
-        return None, None
+            return getattr(self.driver, 'ex_'.format(func), None)
+        return None
 
     """
-    Check if a value chain (ex. 'a,b,c') exists in our list of known items
+    Import PEM certificate with provider
+    """
+    def __import_pem(self, key_name, pem_file_path, password):
+        key_import = self.__function_or_ex_function('import_key_pair_from_file')
+        try:
+            pem = paramiko.RSAKey.from_private_key_file(os.path.expandvars(os.path.expanduser(pem_file_path)), password)
+        except SSHException:
+            try:
+                pem = paramiko.DSSKey.from_private_key_file(os.path.expandvars(os.path.expanduser(pem_file_path)), password)
+            except SSHException:
+                raise KeypairError('could not import %s in rsa or dss format', pem_file_path)
+        if not pem:
+            raise KeypairError('could not import %s', pem_file_path)
+        else:
+            f = NamedTemporaryFile('w+t')
+            f.write('{} {}'.format(pem.get_name(), pem.get_base64()))
+            key_import(name=key_name, key_file_path=f.name)
+            f.close()
+
+    """
+    Check if a value chain (ex. 'a,b,c') exists in our list of known items (item.name | item.id)
     """
     @staticmethod
     def __check_name_or_id(values, known):
